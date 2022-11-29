@@ -1,0 +1,517 @@
+
+/*
+ */
+
+#include "datasheet.hpp"
+#include "FmsTools.hpp"
+#include "XPLMPlugin.h"
+#include "XPLMDisplay.h"
+#include "XPLMGraphics.h"
+#include "XPLMProcessing.h"
+#include "XPLMDataAccess.h"
+#include "XPLMMenus.h"
+#include "XPLMUtilities.h"
+#include "XPLMNavigation.h"
+#include "XPLMPlanes.h"
+#include "XPWidgets.h"
+#include "XPStandardWidgets.h"
+#include "AppsMessage.hpp"
+#include "PracticalSocket.hpp"
+#include "ClientThread.hpp"
+#include "XPLMTools.hpp"
+#include "version.hpp"
+#include "json.hpp"
+#include "global.hpp"
+
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <map>
+#include <locale.h>
+#include <list>
+#include <sstream>
+#include <iostream>
+#include <fstream>
+#if IBM
+#include <windows.h>
+#include <GL/gl.h>
+#else
+#include <pthread.h>
+#include <unistd.h>
+#endif
+#include <time.h>
+#include <cstdarg>
+#include <thread>
+
+using namespace std;
+using json = nlohmann::json;
+
+#define SMALL_BUFFER_SIZE 512
+#define MEDIUM_BUFFER_SIZE 1024
+#define LARGE_BUFFER_SIZE 4096
+#define HUGE_BUFFER_SIZE 8192
+#define TCP_IN_PORT 49101
+#define UDP_OUT_PORT 49102
+#define MULTICAST_PORT 49103
+//interval in second (positive) between 2 multicast signals: every 5 seconds
+#define MULTICAST_INTERVAL 5
+//interval to call the main loop callback (negative values are in cycles, positives in seconds)
+#define MAIN_LOOP_CALLBACK_INTERVAL 0.01f  //100 times per second (if reachable)
+//check client health every 10 cycles
+#define CHECK_CLIENTS_CALLBACK_INTERVAL -10
+//check fms content every 10 cycles
+#define CHECK_FMS_CALLBACK_INTERVAL -10
+//the UDP socket used to send non connected data to clients. the address of the client will have to be given at sending
+#define AVANDRO_GROUP "239.255.1.2"
+
+/// Widgets
+static XPWidgetID ClientsUtilityWidget = NULL;
+
+XPWidgetID	InstructionsWidget = NULL;
+XPWidgetID	InstructionsWindow = NULL;
+XPWidgetID	InstructionsTextWidget[50] = {NULL};
+
+#if IBM
+HANDLE hThreadServer;
+#else
+long hThreadServer;
+#endif
+
+int inPort = TCP_IN_PORT; // Port to listen for clients
+int outPort = UDP_OUT_PORT;//port to send UDP data
+int mcPort = MULTICAST_PORT;//multicast port
+string multicastGroup = AVANDRO_GROUP;//group for the discover function
+
+float mainLoopInterval = MAIN_LOOP_CALLBACK_INTERVAL;
+float checkClientInterval = CHECK_CLIENTS_CALLBACK_INTERVAL;
+float fmsInterval = CHECK_FMS_CALLBACK_INTERVAL;
+float multicastInterval = MULTICAST_INTERVAL;
+bool terminateServer = false; //set to TRUE to terminate the server (done by XPluginStop)
+bool sendData = false; //set to true if the plugin can send data
+//parameters are stored in Plugin/avandro/params.json
+json params;
+
+
+
+UDPSocket* multicastSocket;
+
+typedef vector<ClientThread*> ClientVector;
+
+ClientVector clients;
+
+// Used by the plugin menu
+#define MENU_ITEM_RELOAD "reload plugin"
+#define MENU_ITEM_SHOW_APPS "Show connected apps"
+int g_menu_container_idx; // The index of our menu item in the Plugins menu
+XPLMMenuID g_menu_id = 0;
+bool clientsWidgetDisplayed = false;
+
+static void CreateClientsWidget(int x1, int y1, int w, int h);
+
+
+//Process menu item
+void menuHandler(void * in_menu_ref, void * in_item_ref){
+	unsigned long item = (unsigned long) in_item_ref;
+	switch (item){
+	case 1:
+		if (!clientsWidgetDisplayed)
+		{
+			CreateClientsWidget(221, 640, 420, 290);
+			clientsWidgetDisplayed = true;
+		}
+		else
+			if(!XPIsWidgetVisible(ClientsUtilityWidget))
+				XPShowWidget(ClientsUtilityWidget);
+		break;
+	case 2:
+		XPLMReloadPlugins();
+		break;
+	}
+}
+
+// This is our widget handler.  In this example we are only interested when the close box is pressed.
+int	InstructionsHandler(XPWidgetMessage  inMessage, XPWidgetID  inWidget, intptr_t  inParam1, intptr_t  inParam2)
+{
+	if (inMessage == xpMessage_CloseButtonPushed)
+	{
+		if (clientsWidgetDisplayed)	XPHideWidget(ClientsUtilityWidget);
+		return 1;
+	}
+
+	return 0;
+}
+// This will create our widget dialog.
+// I have made all child widgets relative to the input paramter.
+// This makes it easy to position the dialog
+void CreateClientsWidget(int x, int y, int w, int h)
+{
+	int x2 = x + w;
+	int y2 = y - h;
+
+	// Create the Main Widget window
+	ClientsUtilityWidget = XPCreateWidget(x, y, x2, y2,
+			1,	// Visible
+			"Connected clients",	// desc
+			1,		// root
+			NULL,	// no container
+			xpWidgetClass_MainWindow);
+
+	// Add Close Box decorations to the Main Widget
+	XPSetWidgetProperty(ClientsUtilityWidget, xpProperty_MainWindowHasCloseBoxes, 1);
+	// Print each line of instructions.
+	ostringstream debugMessage;
+	int i = 0;
+	for (auto &client : clients){
+		debugMessage.str("");
+		debugMessage << "type: " << client->getName() << ", hw: "<<client->getMachine()<<", IP:"<<client->getAddress();
+		printInXplnLog(debugMessage.str().c_str());
+		InstructionsTextWidget[i++] = XPCreateWidget(x+10, y-(30+(i*20)) , x2-10, y-(42+(i*20)),
+				1,	// Visible
+				debugMessage.str().c_str(),// desc
+				0,		// root
+				ClientsUtilityWidget,
+				xpWidgetClass_Caption);
+	}
+	// Register our widget handler
+	XPAddWidgetCallback(ClientsUtilityWidget, InstructionsHandler);
+}
+
+
+// Prototype for the XPLMFindSymbol test
+typedef void (*XPLMGetVersions_f)(int * outXPlaneVersion, int * outXPLMVersion,	XPLMHostApplicationID * outHostID);
+
+//declare further
+void installServer();
+
+/**
+ * this loopback is called every 5 seconds to send the address of x-plane to potential clients
+ * it provides a message giving the plugin name and version  and a reference time
+ */
+float multicastLoopBack(float elapsedMe, float elapsedSim, int counter, void * refcon){
+	int size;
+	char nDataC[SMALL_BUFFER_SIZE];
+	sprintf(nDataC, "%s:%d:%d:%ld\n", PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_RELEASE, time(NULL));
+	size = strlen(nDataC);
+	try{
+		//sent the message
+		multicastSocket->sendTo(nDataC, size, multicastGroup, mcPort);
+		debugPrintInXplnLog(string("sending time\n").c_str());
+	}catch(SocketException& e){
+		debugPrintlnInXplnLog(e.what());
+	}
+	//return when to be recalled (5s for next cycle)
+	return MULTICAST_INTERVAL;
+
+}
+/**
+ * the main loop callback for the plugin. It is called repeatedly at every interval of the main
+ * x-plane computation interval.
+ */
+float flightLoopBack(float elapsedMe, float elapsedSim, int counter, void * refcon) {
+	string stringToSend;
+	string header;
+
+	try{
+		json root;
+		root["source"] = PLUGIN_NAME;
+		root["counter"] = counter;
+		root["time"] = time(NULL);
+
+		//create the data structure
+		//data{ref, value}
+
+		//check if the plugin is ready to end data
+		if (sendData){
+			try{
+				if (clients.size()>0){
+					for (auto &client : clients){
+						root["data"] = client->buildMessage(header);
+						if (client->hasDataToSend()){
+							stringToSend = root.dump() + "\n";
+							//++
+							client->sendData(stringToSend);
+							//-- int res = clientUDPSocket.sendTo(stringToSend.c_str(), stringToSend.length(), client->getAddress(), outPort);
+							//--if (res > 0){
+							client->clearDataToSend();
+							//--}
+						}
+					}
+				}
+			}catch(const std::exception& e){
+				printInXplnLog(e.what());
+			}
+		}
+
+	}catch(exception& ex){
+		ostringstream debugMessage;
+		debugMessage << "exception in main loop : " << ex.what();
+		printInXplnLog(debugMessage.str().c_str());
+	}
+
+	//return when to be recalled (-1 for next cycle)
+	return mainLoopInterval;
+}
+
+PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFrom, int inMsg, void * inParam)
+{
+	switch(inMsg)
+	{
+	case XPLM_MSG_PLANE_LOADED:
+		//in case we have something to do after loading
+		break;
+	}
+}
+
+/**
+ * a call back that will register the fms dataref once
+ */
+float dataReRegistrationLoopBack(float elapsedMe, float elapsedSim, int counter, void * refcon){
+	//register the FMS datarefs
+	fmsRegisterEntries();
+	//init with content
+	fmsInit();
+	fmsRegisterToDataRefsPlugin();
+	//returns 0 so that it is not called again
+	return 0;
+}
+
+/**
+ * a loop callback that checks if fms need to be updated
+ */
+float fmsCheckLoopBack(float elapsedMe, float elasedSim, int counter, void *refcon){
+	fmsSelectEntry(XPLMGetDestinationFMSEntry());
+	return fmsInterval;
+}
+
+/**
+ * a loop callback that checks for client health
+ */
+float clientsCheckLoopBack(float elapsedMe, float elasedSim, int counter, void *refcon){
+	//clean clients
+	ClientVector::iterator iClient;
+	ostringstream debugMessage;
+	if (clients.size()>0){
+		for (iClient = clients.begin(); iClient != clients.end();){
+			if ((*iClient)->isTerminated()){
+#if SPEAK
+				XPLMSpeakString(string("connection lost with " + (*iClient)->getName()).c_str());
+#endif
+
+				debugMessage << "removing client: " << (*iClient)->getName();
+				printFormatInXplnLog(debugMessage.str().c_str());
+
+				delete *iClient;
+				iClient = clients.erase(iClient);
+			}else{
+				++iClient;
+			}
+		}
+	}
+	//return when to be recalled (-1 for next cycle)
+	return checkClientInterval;
+}
+
+/**
+ * This is called when the plugin is first loaded.
+ * returns the plugin's name, signature, and description.
+ * allocate permanent resources needed + initialization.
+ * up the user interface: creates a menu to reload plugins.
+ * register required callbacks (mainLoopCB).
+ */
+PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
+	strcpy(outName, PLUGIN_NAME);
+	strcpy(outSig, "net.avandro.xplane");
+	strcpy(outDesc, "A plug-in to connect android Apps to Xplane");
+	printFormatInXplnLog(string(" plugin starting\n").c_str());
+
+	// Create the menus
+	g_menu_container_idx = XPLMAppendMenuItem(XPLMFindPluginsMenu(), PLUGIN_NAME, 0, 0);
+	g_menu_id = XPLMCreateMenu(PLUGIN_NAME, XPLMFindPluginsMenu(), g_menu_container_idx, menuHandler, NULL);
+	XPLMAppendMenuItem(g_menu_id, MENU_ITEM_SHOW_APPS, (void *)1, 1);
+	XPLMAppendMenuSeparator(g_menu_id);
+	XPLMAppendMenuItem(g_menu_id, MENU_ITEM_RELOAD, (void *)2, 1);
+
+	// Defer registering for when the sim is ready.
+	XPLMRegisterFlightLoopCallback(dataReRegistrationLoopBack, 1, NULL);
+	// register the multicast loopback to send the server's address
+	XPLMRegisterFlightLoopCallback(multicastLoopBack, multicastInterval, NULL);
+	//register the loop controlling the health of the clients
+	XPLMRegisterFlightLoopCallback(clientsCheckLoopBack, checkClientInterval, NULL);
+	//register the loop controlling the fms
+	XPLMRegisterFlightLoopCallback(fmsCheckLoopBack, fmsInterval, NULL);
+	//register the main loop callback
+	XPLMRegisterFlightLoopCallback(flightLoopBack, mainLoopInterval, NULL);
+	//install the TCP server
+	installServer();
+	printFormatInXplnLog(string("plugin started\n").c_str());
+#if SPEAK
+	XPLMSpeakString(string("avandro plugin installed").c_str());
+#endif
+	//returns 1 so it is called again
+	return 1;
+}
+
+PLUGIN_API void XPluginStop(void) {
+	XPLMDestroyMenu(g_menu_id);
+	XPLMUnregisterFlightLoopCallback(dataReRegistrationLoopBack, NULL);
+	XPLMUnregisterFlightLoopCallback(clientsCheckLoopBack, NULL);
+	XPLMUnregisterFlightLoopCallback(fmsCheckLoopBack, NULL);
+	XPLMUnregisterFlightLoopCallback(flightLoopBack, NULL);
+	if (clientsWidgetDisplayed)
+	{
+		XPDestroyWidget(InstructionsWidget, 1);
+		clientsWidgetDisplayed = false;
+	}
+	printFormatInXplnLog(string("terminated\n").c_str());
+	// free memory
+	for (auto &client : clients){
+		delete client;
+	}
+	clients.clear();
+	delete multicastSocket;
+
+	terminateServer = true;
+#if IBM
+	TerminateThread(hThreadServer, 0); 
+	CloseHandle(hThreadServer);
+#endif
+}
+
+PLUGIN_API int XPluginEnable(void) {
+	printFormatInXplnLog(string("enabled\n").c_str());
+	sendData = true;
+	return 1;
+}
+
+PLUGIN_API int XPluginDisable(void) {
+	printFormatInXplnLog(string("disabled\n").c_str());
+	sendData = false;
+	return 1;
+}
+
+
+
+/*
+ * xplane avAndro TCP server thread.
+ *
+ */
+#if IBM
+DWORD WINAPI tcpServerThread(LPVOID lpParam){
+#else
+void tcpServerThread() {
+#endif
+
+
+	setlocale(LC_ALL, ".OCP");
+	string msg = "starting server thread\n";
+	printInXplnLog(msg.c_str());
+	cout << msg;
+	try{
+		// Create our listening socket
+		ostringstream debugMessage;
+		debugMessage << "listening on port "  << inPort << "\n";
+		debugMessage << "sending multicast data on "  << outPort << "\n";
+		cout << debugMessage.str();
+		printInXplnLog(debugMessage.str().c_str());
+
+		TCPServerSocket *serverSocket = new TCPServerSocket(inPort);
+		while (!terminateServer){
+			TCPSocket *pClientTCPSocket = serverSocket->accept();
+			pClientTCPSocket->setReuse();
+			string addr(pClientTCPSocket->getForeignAddress());
+#if SPEAK
+			XPLMSpeakString("new connection");
+#endif
+
+			try{
+
+				ClientThread *client = new ClientThread(pClientTCPSocket);
+				clients.push_back(client);
+				debugMessage.str("");
+				debugMessage << "Accepted client " << addr.c_str() << "port " << pClientTCPSocket->getForeignPort()<< " total clients :"<< clients.size() <<"\n";
+				printInXplnLog(debugMessage.str().c_str());
+				cout << debugMessage.str();
+			}
+			catch(SocketException &se){
+				string s("exception in tcpServerThread ");
+				s.append(se.what());
+				debugPrintlnInXplnLog(s.c_str());
+			}
+		}
+		serverSocket->cleanUp();
+		delete serverSocket;
+
+	}catch(exception &ex){
+		cout<<"exception:" <<ex.what() <<"\n";
+	}
+	const string s = "server started\n";
+	cout << s;
+	printFormatInXplnLog(s.c_str());
+#if IBM
+	return 0;
+#endif
+}
+
+
+void installServer() {
+	char pluginPath [512];
+	//read the parameters in "params.json"
+	try{
+		XPLMGetSystemPath(pluginPath);
+		strcat(pluginPath,"Resources/plugins/avandro/config.json");
+		std::ifstream paramsFile(pluginPath);
+		paramsFile >> params;
+		mainLoopInterval = params["frequencies"]["flight"];
+		checkClientInterval = params["frequencies"]["check clients"];
+		fmsInterval = params["frequencies"]["fms"];
+		multicastInterval = params["frequencies"]["multicast"];
+		inPort = params["ports"]["listen"];
+		outPort = params["ports"]["send"];
+		mcPort = params["ports"]["multicast"];
+		global_vars::options.debug = params["debug"];
+		multicastGroup = params["ipV4"]["multicast group"];
+		multicastSocket = new UDPSocket(multicastGroup, mcPort, false);
+
+
+	}catch(exception se){
+		//create a param json file with default values
+		cout << se.what() << " :" << pluginPath << " not found, using default";
+		//the default values for parameters
+		params["debug"] = false;
+		params["ports"] = {
+				{"listen", TCP_IN_PORT},
+				{"send", UDP_OUT_PORT},
+				{"multicast", MULTICAST_PORT} };
+		params["ipV4"] = {
+				{"multicast group", AVANDRO_GROUP}
+		};
+		params["frequencies"] = {
+				{"multicast", MULTICAST_INTERVAL},
+				{"flight", MAIN_LOOP_CALLBACK_INTERVAL},
+				{"check clients", CHECK_CLIENTS_CALLBACK_INTERVAL},
+				{"fms", CHECK_FMS_CALLBACK_INTERVAL}
+		};
+		try{
+			ofstream o(pluginPath);
+			o << std::setw(4) << params << "\n";
+		}catch (exception se){
+			cout << se.what() << " :" << pluginPath << " not found, using default\n";
+		}
+
+	}
+
+#if IBM
+	DWORD dwThreadId;
+	hThreadServer = CreateThread(NULL, 0, tcpServerThread, NULL, 0, &dwThreadId);
+#else
+	pthread_t dwThreadId;
+	hThreadServer = pthread_create(&dwThreadId, NULL, tcpServerThread, NULL);
+#endif
+	cout << "server installed \n";
+	printFormatInXplnLog("server installed \n");
+#if SPEAK
+	XPLMSpeakString("X plane android server installed");
+#endif
+}
+//---------------------------------------------------------------------------
+

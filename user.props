@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <xplane_plugin>C:\X-Plane 11\Resources\plugins\avandro\64\</xplane_plugin>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="xplane_plugin">
+      <Value>$(xplane_plugin)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

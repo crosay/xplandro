@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ShowAllFiles>true</ShowAllFiles>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommand>C:\X-Plane 11\X-Plane.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>..\..\..\..\..\X-Plane 11</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerAttach>false</LocalDebuggerAttach>
+    <DebuggerFlavor>WindowsRemoteDebugger</DebuggerFlavor>
+    <RemoteDebuggerDebuggerType>Auto</RemoteDebuggerDebuggerType>
+    <RemoteDebuggerCommand>C:\X-Plane 11\X-Plane.exe</RemoteDebuggerCommand>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='evaluation|x64'">
+    <LocalDebuggerCommand>C:\X-Plane 11\X-Plane.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>..\..\..\..\..\X-Plane 11</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerAttach>false</LocalDebuggerAttach>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommand>C:\X-Plane 11\X-Plane.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>..\..\..\..\..\X-Plane 11</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerDebuggerType>NativeOnly</LocalDebuggerDebuggerType>
+  </PropertyGroup>
+</Project>
