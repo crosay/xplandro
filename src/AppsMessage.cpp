@@ -24,7 +24,6 @@ AppsMessage::AppsMessage() {
 	dataType = xplmType_Unknown;
 	dataref = NULL;
 	outAddress = "";
-	index = NOT_A_REFERENCE;
 	sentBoolean = false;
 	cycle = 1;
 	count = 0;
@@ -39,10 +38,9 @@ AppsMessage::AppsMessage() {
  * aCycle: the number of Xplane loop cycles between 2 sendings.
  * if negative, then the data will be checked every cycle and send only if changed
  */
-AppsMessage::AppsMessage(string addrs, string aDataRefName, int anIndex, long aCycle, bool aLoop) {
+AppsMessage::AppsMessage(string addrs, string aDataRefName, long aCycle, bool aLoop) {
 
 	datarefName = aDataRefName;
-	index = anIndex;
 	if (&datarefName != NULL){
 		dataref = XPLMFindDataRef(datarefName.c_str());
 		if (dataref == NULL){
@@ -51,7 +49,7 @@ AppsMessage::AppsMessage(string addrs, string aDataRefName, int anIndex, long aC
 		}else{
 			valid = true;
 		}
-		dataType = getDataType(anIndex);
+		dataType = XPLMGetDataRefTypes(dataref);
 	}else{
 		valid = true;
 		dataref = NULL;
@@ -157,13 +155,13 @@ AppsMessage::~AppsMessage() {
 }
 
 /**
- * buid a key that can identify a unique means to address a data (ip address and datanum)
+ * buid a key that can identify a unique means to address a data (ip address and dataref)
  */
-int buildKey(std::string addrs, int ref, std::string dataref) {
+int buildKey(std::string addrs, std::string dataref) {
 	char ckey[255];
 	std::hash<std::string> str_hash;
 
-	sprintf(ckey, "%s:%d:%s", addrs.c_str(), ref,dataref);
+	sprintf(ckey, "%s:%s", addrs.c_str(),dataref);
 	std::string res(ckey);
 	return str_hash(res);
 }

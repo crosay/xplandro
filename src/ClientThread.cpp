@@ -143,15 +143,10 @@ DWORD ClientThread::run(){
 					}
 					if ((&dataref != NULL) && (dataref!="")){
 						value = ci.getGroupAsString(1);
-						key = buildKey(address, index, dataref);
+						key = buildKey(address, dataref);
 						if (mapMessages.find(key) == mapMessages.end()) {
 							//data does not exit, create the dataref first with no request for update
-							if (ci.isDataref()) {
-								addDataToCycle(address, dataref, -1, 0, false);
-							}
-							else {
-								addDataToCycle(address, index, 0, false);
-							}
+							addDataToCycle(address, dataref, 0, false);
 						}
 						ref = (mapMessages)[key].dataref;
 						if (ref != NULL) {
@@ -182,74 +177,7 @@ DWORD ClientThread::run(){
 					//get value numdata cycle loop
 					//require the data given in dataref index (field 1) to be send every x cycles (field 2)
 					//continuously if loop (field 3) is true
-					if (ci.isDataref()) {
-						addDataToCycle(address, ci.getGroupAsString(0), -1, ci.getGroupAsInt(1), ci.getGroupAsBool(2));
-					}
-					else {
-						addDataToCycle(address, ci.getGroupAsInt(0), ci.getGroupAsInt(1), ci.getGroupAsBool(2));
-					}
-					break;
-				case FMS_INIT:
-					fmsInit();
-					break;
-				case FMS_CLR:
-					// fms clear (all)
-					if (ci.getGroup()[0] == "all") {
-						fmsClearAll();
-						fmsUpdateXplaneStructure(getSelectedFms());
-					}
-					else {
-						int index = ci.getGroupAsInt(0);
-						fmsClear(index);
-					}
-					fmsUpdateXplaneStructure(getSelectedFms());
-					break;
-				case FMS_ADD:
-					//fms add name lat lon altitude type flyover
-					//add the entry in the FMS with the waypoint given by its name and location
-					id = ci.getGroupAsString(0);
-					lat = ci.getGroupAsFloat(1);
-					lon = ci.getGroupAsFloat(2);
-					altitude = ci.getGroupAsInt(3);
-					type = ci.getGroupAsInt(4);
-					flyover = ci.getGroupAsBool(5);
-					addFMSEntry(id, lat, lon, altitude, type, flyover);
-					fmsUpdateXplaneStructure(getSelectedFms());
-					break;
-				case FMS_INSERT:
-					//FMSINS, index, name, lat, lon, altitude, type, flyover
-					//insert the entry in the FMS with at position the waypoint given by its name and location
-					index = ci.getGroupAsInt(0);
-					id = ci.getGroupAsString(1);
-					lat = ci.getGroupAsFloat(2);
-					lon = ci.getGroupAsFloat(3);
-					altitude = ci.getGroupAsInt(4);
-					type = ci.getGroupAsInt(5);
-					flyover = ci.getGroupAsBool(6);
-					insertFMSEntry(index, id, lat, lon, altitude, type, flyover);
-					fmsUpdateXplaneStructure(getSelectedFms());
-					break;
-				case FMS_COUNT:
-					addDataToCycle(address, FMS1_ENTRIES_NUMBER, 0, false);
-					break;
-				case FMS_SET:
-					//fms set index name lat lon altitude type flyover
-					//set the entry in the FMS at the index with the waypoint given by its name and location
-					index = ci.getGroupAsInt(0);
-					id = ci.getGroupAsString(1);
-					lat = ci.getGroupAsFloat(2);
-					lon = ci.getGroupAsFloat(3);
-					altitude = ci.getGroupAsInt(4);
-					type = ci.getGroupAsInt(5);
-					flyover = ci.getGroupAsBool(6);
-					setFMSEntry(index, id, lat, lon, altitude, type, flyover);
-					fmsUpdateXplaneStructure(getSelectedFms());
-					break;
-				case FMS_DIR_TO:
-					//fms dirto index
-					//direct to the entry in the fms (select the line at index)
-					index = ci.getGroupAsInt(0);
-					fmsSelectEntry(index);
+					addDataToCycle(address, ci.getGroupAsString(0), ci.getGroupAsInt(1), ci.getGroupAsBool(2));
 					break;
 				case QUIT:
 					eot = true;
@@ -316,7 +244,7 @@ json ClientThread::buildMessage(string header){
 				dataToSend = true;
 				int size = 0;
 				json data;
-				data["ref"] = msg.index;
+				data["ref"] = msg.datarefName;
 				json value;
 				//reset the counter
 				mit->second.count = msg.cycle;
@@ -414,27 +342,14 @@ void ClientThread::clean(){
 	printInXplnLog("client cleaned\n");
 }
 
-/**
- * add a dataref request to the main loop
- * address is the address to the the to
- * numData is the number of the data as listed in datasheet.h
- * aCycle is the number of plugin main cycles between 2 data sending
- * aLoop is true if it is a repetitive sending, false if one shot
- */
-void ClientThread::addDataToCycle(string address, int numData, int aCycle, bool aLoop){
-	string dataref = getDataRef(numData);
-	if (&dataref != NULL) {
-		this->addDataToCycle(address, dataref, numData, aCycle, aLoop);
-	}
-}
 
 /**
-*address is the address to the the to
+*address is the IP address of the cient
 * dataref is the string referencing a xplane dataref eg: sim/autopilot/...
-* aCycle is the number of plugin main cycles between 2 data sending
+* aCycle is the number of plugin main cycles between 2 data update
 * aLoop is true if it is a repetitive sending, false if one shot
 */
-void ClientThread::addDataToCycle(string address, string dataref, int numData, int aCycle, bool aLoop) {
+void ClientThread::addDataToCycle(string address, string dataref, int aCycle, bool aLoop) {
 	debugPrintlnInXplnLog("ClientThread::addDataToCycle\n");
 	try {
 		if (&dataref != NULL) {
@@ -442,9 +357,9 @@ void ClientThread::addDataToCycle(string address, string dataref, int numData, i
 			//create a new message object
 			//address to send the message to
 			//dataref point to the data reference
-			AppsMessage msg(address, dataref, numData, aCycle, aLoop);
+			AppsMessage msg(address, dataref, aCycle, aLoop);
 			if (msg.isValid()) {
-				int key = buildKey(address, numData, dataref);
+				int key = buildKey(address, dataref);
 				if ((mapMessages)[key].dataref == NULL) {
 					(mapMessages)[key] = msg;
 				}

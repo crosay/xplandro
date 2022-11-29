@@ -38,9 +38,7 @@ private:
 	//stores the list of messages to pass during the next xpl iteration
 	MessagesMap mapMessages;
 
-
-	void addDataToCycle(string address, int numData, int aCycle, bool aLoop);
-	void addDataToCycle(string address, string dataref, int numData, int aCycle, bool aLoop);
+	void addDataToCycle(string address, string dataref, int aCycle, bool aLoop);
 	void setFMSEntry(int index, string id, float lat, float lon, float altitude, int type, bool flyover);
 	void addFMSEntry(string id, float lat, float lon, float altitude, int type, bool flyover);
 	void insertFMSEntry(int before, string id, float lat, float lon, int altitude, int type, bool flyover);

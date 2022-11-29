@@ -206,18 +206,8 @@ std::string getDataRef(int index){
 }
 
 XPLMDataTypeID getDataType(int index){
-	switch (index){
-	case FMS1_ENTRIES_NUMBER:
-	case FMS2_ENTRIES_NUMBER:
-	case FMS1_SELECTED_ENTRY:
-	case FMS2_SELECTED_ENTRY:
-	case FMS_ACTIVE:
-	return xplmType_Int;
-	default:
-		XPLMDataRef dataRef = XPLMFindDataRef(getDataRef(index).c_str());
-		return XPLMGetDataRefTypes(dataRef);
-
-	}
+	XPLMDataRef dataRef = XPLMFindDataRef(getDataRef(index).c_str());
+	return XPLMGetDataRefTypes(dataRef);
 }
 
 

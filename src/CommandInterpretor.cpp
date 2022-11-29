@@ -13,23 +13,25 @@
 #include "version.hpp"
 using namespace std;
 
+const std::string DATAREF_RE = "(?<dataref>(?:\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)";
+
 /**regular expression for hello command
  * start with 'hello' separate by either one space or one , then (user) (machine)
  * */
-regex helloRe("hello[\\s+](avandro)(.+)\\s+(.+)",regex_constants::icase);
+regex helloRe("hello[\\s+](avandro)(.+)\\s+(.+)", regex_constants::icase);
 /**regular expression for command
- * start with 'command' or 'cmd' separate by one or more space then the command then start or stop
+ * start with 'cmd' separate by one or more space then the command then start or stop
  * */
-regex cmdRe("(?:co?mm?a?n?d)\\s+((?:\\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)\\s*(start|stop|once)",regex_constants::icase);
+regex cmdRe("(?:cmd)\\s+" + DATAREF_RE + "\\s*(?<action>start|stop|once)", regex_constants::icase);
 /**
  * set value (dataref) (value)
  */
-regex setValueRe("(?:set\\s*v?a?l?u?e?)\\s+((?:\\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)\\s*((?:\\d+\\.*\\d*)|(?:.+))", regex_constants::icase);
+regex setRe("(?:set)\\s+" + DATAREF_RE + "\\s * (? <val>(? : \\d + \\.*\\d*) | (? : . + ))", regex_constants::icase);
 
 /**
- * get value (index) (frequency - optional) (repeat - optional)
+ * get dataref
  */
-regex getValueRe("(?:get\\s*v?a?l?u?e?)\\s+((?:\\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)\\s*(\\d*)\\s*(true|false)?",regex_constants::icase);
+regex getRe("(?:get)\\s+" + DATAREF_RE + "\\s*(\\d*)\\s*(true|false)?",regex_constants::icase);
 /**
  * get value ([index1, index2,index3...]) (frequency - optional) (repeat - optional)
  */

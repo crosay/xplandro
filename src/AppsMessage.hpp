@@ -18,41 +18,24 @@ class AppsMessage {
 private:
 
 public:
-	//the name of the dataref to point to inX-PLANE
-	string datarefName;
-	//the address to send datagram packet to
-	string outAddress;
-	//the dataref structure
-	XPLMDataRef dataref;
-	//dataref type of data
-	XPLMDataTypeID dataType;
-	//index of the datasheet as specified in datasheet.hpp, used to synchronize data with the client
-	int index;
-	//true if need to send the data at each iteration; false = only one shot
-	bool loop;
-	//true if the data was sent during the previous cycle
-	bool sentBoolean;
-	//number of cycles between 2 send
-	long cycle;
-	//the actual cycle
-	long count;
-	bool valid;
-	//true if the main loop has to change the Xplane dataref with value
-	bool updateRequired;
-	//the value is always in float converted via (int) to integer
-	float value;
-	//the value as string (can be non numeric)
-	string strValue;
-	//the old value as sent to the client
-	string oldValue = "";
-	//send only when the data change
-	bool sendOnChange = false;
-	//for arrays
-	std::vector<float> values, oldValues;
-
+	string datarefName;//the name of the dataref to point to inX-PLANE
+	string outAddress;//the address to send datagram packet to
+	XPLMDataRef dataref;//the dataref structure
+	XPLMDataTypeID dataType;//dataref type of data
+	bool loop;//true if need to send the data at each iteration; false = only one shot
+	bool sentBoolean;//true if the data was sent during the previous cycle
+	long cycle;//number of cycles between 2 send
+	long count;//the actual cycle
+	bool valid;//true if the data is valid
+	bool updateRequired;//true if the main loop has to change the Xplane dataref with value
+	float value;//the value is always in float converted via (int) to integer
+	string strValue;//the value as string (can be non numeric)
+	string oldValue = "";//the old value as sent to the client
+	bool sendOnChange = false;//send only when the data change
+	std::vector<float> values, oldValues;//for arrays
 
 	AppsMessage();
-	AppsMessage(std::string addrs, std::string aDataRefName, int anIndex, long aCycle, bool aLoop);
+	AppsMessage(std::string addrs, std::string aDataRefName, long aCycle, bool aLoop);
 	bool isValid(void);
 	bool isSent(void);
 	void setSent(void);
@@ -71,7 +54,7 @@ public:
 
 };
 
-int buildKey(std::string addrs, int dr, std::string dataref);
+int buildKey(std::string addrs, std::string dataref);
 
 #endif /* APPSMESSAGE_H_ */
 

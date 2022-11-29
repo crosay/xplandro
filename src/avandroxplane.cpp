@@ -52,17 +52,12 @@ using json = nlohmann::json;
 #define HUGE_BUFFER_SIZE 8192
 #define TCP_IN_PORT 49101
 #define UDP_OUT_PORT 49102
-#define MULTICAST_PORT 49103
-//interval in second (positive) between 2 multicast signals: every 5 seconds
-#define MULTICAST_INTERVAL 5
+
 //interval to call the main loop callback (negative values are in cycles, positives in seconds)
 #define MAIN_LOOP_CALLBACK_INTERVAL 0.01f  //100 times per second (if reachable)
 //check client health every 10 cycles
 #define CHECK_CLIENTS_CALLBACK_INTERVAL -10
-//check fms content every 10 cycles
-#define CHECK_FMS_CALLBACK_INTERVAL -10
-//the UDP socket used to send non connected data to clients. the address of the client will have to be given at sending
-#define AVANDRO_GROUP "239.255.1.2"
+
 
 /// Widgets
 static XPWidgetID ClientsUtilityWidget = NULL;
@@ -79,13 +74,8 @@ long hThreadServer;
 
 int inPort = TCP_IN_PORT; // Port to listen for clients
 int outPort = UDP_OUT_PORT;//port to send UDP data
-int mcPort = MULTICAST_PORT;//multicast port
-string multicastGroup = AVANDRO_GROUP;//group for the discover function
-
 float mainLoopInterval = MAIN_LOOP_CALLBACK_INTERVAL;
 float checkClientInterval = CHECK_CLIENTS_CALLBACK_INTERVAL;
-float fmsInterval = CHECK_FMS_CALLBACK_INTERVAL;
-float multicastInterval = MULTICAST_INTERVAL;
 bool terminateServer = false; //set to TRUE to terminate the server (done by XPluginStop)
 bool sendData = false; //set to true if the plugin can send data
 //parameters are stored in Plugin/avandro/params.json
@@ -183,26 +173,7 @@ typedef void (*XPLMGetVersions_f)(int * outXPlaneVersion, int * outXPLMVersion,	
 //declare further
 void installServer();
 
-/**
- * this loopback is called every 5 seconds to send the address of x-plane to potential clients
- * it provides a message giving the plugin name and version  and a reference time
- */
-float multicastLoopBack(float elapsedMe, float elapsedSim, int counter, void * refcon){
-	int size;
-	char nDataC[SMALL_BUFFER_SIZE];
-	sprintf(nDataC, "%s:%d:%d:%ld\n", PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_RELEASE, time(NULL));
-	size = strlen(nDataC);
-	try{
-		//sent the message
-		multicastSocket->sendTo(nDataC, size, multicastGroup, mcPort);
-		debugPrintInXplnLog(string("sending time\n").c_str());
-	}catch(SocketException& e){
-		debugPrintlnInXplnLog(e.what());
-	}
-	//return when to be recalled (5s for next cycle)
-	return MULTICAST_INTERVAL;
 
-}
 /**
  * the main loop callback for the plugin. It is called repeatedly at every interval of the main
  * x-plane computation interval.
@@ -276,14 +247,6 @@ float dataReRegistrationLoopBack(float elapsedMe, float elapsedSim, int counter,
 }
 
 /**
- * a loop callback that checks if fms need to be updated
- */
-float fmsCheckLoopBack(float elapsedMe, float elasedSim, int counter, void *refcon){
-	fmsSelectEntry(XPLMGetDestinationFMSEntry());
-	return fmsInterval;
-}
-
-/**
  * a loop callback that checks for client health
  */
 float clientsCheckLoopBack(float elapsedMe, float elasedSim, int counter, void *refcon){
@@ -333,19 +296,15 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
 
 	// Defer registering for when the sim is ready.
 	XPLMRegisterFlightLoopCallback(dataReRegistrationLoopBack, 1, NULL);
-	// register the multicast loopback to send the server's address
-	XPLMRegisterFlightLoopCallback(multicastLoopBack, multicastInterval, NULL);
 	//register the loop controlling the health of the clients
 	XPLMRegisterFlightLoopCallback(clientsCheckLoopBack, checkClientInterval, NULL);
-	//register the loop controlling the fms
-	XPLMRegisterFlightLoopCallback(fmsCheckLoopBack, fmsInterval, NULL);
 	//register the main loop callback
 	XPLMRegisterFlightLoopCallback(flightLoopBack, mainLoopInterval, NULL);
 	//install the TCP server
 	installServer();
-	printFormatInXplnLog(string("plugin started\n").c_str());
+	printFormatInXplnLog(string("avandro plugin started\n").c_str());
 #if SPEAK
-	XPLMSpeakString(string("avandro plugin installed").c_str());
+	XPLMSpeakString(string("avandro installed").c_str());
 #endif
 	//returns 1 so it is called again
 	return 1;
@@ -355,7 +314,6 @@ PLUGIN_API void XPluginStop(void) {
 	XPLMDestroyMenu(g_menu_id);
 	XPLMUnregisterFlightLoopCallback(dataReRegistrationLoopBack, NULL);
 	XPLMUnregisterFlightLoopCallback(clientsCheckLoopBack, NULL);
-	XPLMUnregisterFlightLoopCallback(fmsCheckLoopBack, NULL);
 	XPLMUnregisterFlightLoopCallback(flightLoopBack, NULL);
 	if (clientsWidgetDisplayed)
 	{
@@ -372,7 +330,7 @@ PLUGIN_API void XPluginStop(void) {
 
 	terminateServer = true;
 #if IBM
-	TerminateThread(hThreadServer, 0); 
+	WaitForSingleObject(hThreadServer, INFINITE);
 	CloseHandle(hThreadServer);
 #endif
 }
@@ -454,7 +412,7 @@ void tcpServerThread() {
 
 
 void installServer() {
-	char pluginPath [512];
+	char pluginPath [1024];
 	//read the parameters in "params.json"
 	try{
 		XPLMGetSystemPath(pluginPath);
@@ -463,14 +421,9 @@ void installServer() {
 		paramsFile >> params;
 		mainLoopInterval = params["frequencies"]["flight"];
 		checkClientInterval = params["frequencies"]["check clients"];
-		fmsInterval = params["frequencies"]["fms"];
-		multicastInterval = params["frequencies"]["multicast"];
 		inPort = params["ports"]["listen"];
 		outPort = params["ports"]["send"];
-		mcPort = params["ports"]["multicast"];
 		global_vars::options.debug = params["debug"];
-		multicastGroup = params["ipV4"]["multicast group"];
-		multicastSocket = new UDPSocket(multicastGroup, mcPort, false);
 
 
 	}catch(exception se){
@@ -480,16 +433,10 @@ void installServer() {
 		params["debug"] = false;
 		params["ports"] = {
 				{"listen", TCP_IN_PORT},
-				{"send", UDP_OUT_PORT},
-				{"multicast", MULTICAST_PORT} };
-		params["ipV4"] = {
-				{"multicast group", AVANDRO_GROUP}
-		};
+				{"send", UDP_OUT_PORT}};
 		params["frequencies"] = {
-				{"multicast", MULTICAST_INTERVAL},
 				{"flight", MAIN_LOOP_CALLBACK_INTERVAL},
-				{"check clients", CHECK_CLIENTS_CALLBACK_INTERVAL},
-				{"fms", CHECK_FMS_CALLBACK_INTERVAL}
+				{"check clients", CHECK_CLIENTS_CALLBACK_INTERVAL}
 		};
 		try{
 			ofstream o(pluginPath);
