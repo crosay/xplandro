@@ -1,8 +1,6 @@
 /*
  * CommandInterpretor.cpp
  *
- *  Created on: 31 janv. 2018
- *      Author: cyrille
  */
 
 #include "CommandInterpretor.hpp"
@@ -13,83 +11,83 @@
 #include "version.hpp"
 using namespace std;
 
-const std::string DATAREF_RE = "(?<dataref>(?:\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)";
+const std::string DATAREF_RE = "(?<dataref>(?:\\d+)|(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+)";
+const std::string ACURACY_RE = "(?<acc>\\d+\\.*\\d*)*";
+/**regular expression for xplane dataref abc/abdc... */
+//regex datarefRe("(.+\\/.+)+");
+regex datarefRe("(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+");
 
-/**regular expression for hello command
- * start with 'hello' separate by either one space or one , then (user) (machine)
- * */
-regex helloRe("hello[\\s+](avandro)(.+)\\s+(.+)", regex_constants::icase);
 /**regular expression for command
  * start with 'cmd' separate by one or more space then the command then start or stop
  * */
-regex cmdRe("(?:cmd)\\s+" + DATAREF_RE + "\\s*(?<action>start|stop|once)", regex_constants::icase);
+const regex cmdRe("(?<cmd>cmd)\\s+" + DATAREF_RE + "\\s*(?<action>start|stop|once)", regex_constants::icase);
 /**
  * set value (dataref) (value)
  */
-regex setRe("(?:set)\\s+" + DATAREF_RE + "\\s * (? <val>(? : \\d + \\.*\\d*) | (? : . + ))", regex_constants::icase);
+const regex setRe("(?<cmd>set)\\s+" + DATAREF_RE + "\\s * (? <val>(? : \\d + \\.*\\d*) | (? : . + ))", regex_constants::icase);
 
 /**
  * get dataref
  */
-regex getRe("(?:get)\\s+" + DATAREF_RE + "\\s*(\\d*)\\s*(true|false)?",regex_constants::icase);
+const regex getRe("(?<cmd>get)\\s+" + DATAREF_RE + "\\s*(\\d*)\\s*",regex_constants::icase);
+
 /**
- * get value ([index1, index2,index3...]) (frequency - optional) (repeat - optional)
+ * sub dataref
  */
-regex getMultIndexRe("get\\s*v?a?l?u?e?[\\s +](\\[(.+[\\s +])*.d+\\])[\\s +](\\d+)?[\\s +]?(true|false)?",regex_constants::icase);
+const regex subRe("(?<cmd>sub)\\s+" + DATAREF_RE + "\\s*" + ACURACY_RE, regex_constants::icase);
+
 /**
  * fmsinit or fms init
  */
-regex fmsInitRe("fms\\s*init",regex_constants::icase);
+const regex fmsInitRe("fms\\s*init",regex_constants::icase);
 /**
  * fmsclear or fms clear
  */
-regex fmsClearRe("fms\\s*clear[\\s +]?((\\d+)|(all))",regex_constants::icase);
+const regex fmsClearRe("fms\\s*clear[\\s +]?((\\d+)|(all))",regex_constants::icase);
 /**
  * fms count or fms count
  */
-regex fmsCountRe("fms\\s*count",regex_constants::icase);
+const regex fmsCountRe("fms\\s*count",regex_constants::icase);
 
 /**
  * fmsset index name lat lon altitude type (overfly-optional)
  */
-regex fmsSetRe("fms\\s*set[\\s +](\\d+)[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
+const regex fmsSetRe("fms\\s*set[\\s +](\\d+)[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
 
 /**
  * fmsins index name lat lon altitude type (overfly-optional)
  */
-regex fmsInsRe("fms\\s*inse?r?t?[\\s +](\\d+)[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
+const regex fmsInsRe("fms\\s*inse?r?t?[\\s +](\\d+)[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
 
 /**
  * fmsadd name lat lon altitude type (overfly-optional)
  */
-regex fmsAddRe("fms\\s*add[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
+const regex fmsAddRe("fms\\s*add[\\s +]([a-zA-Z0-9]+)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +]([+-]?\\d+\\.*\\d*)[\\s +](\\d+)[\\s +](\\d+)[\\s +]?(true|false)?",regex_constants::icase);
 
 /**
  * fms dir (to) index
  * or fmd dir (to), index
  */
-regex fmsDtoRe( "fms\\s+dir\\s*t?o?[\\s +](\\d+)",regex_constants::icase);
+const regex fmsDtoRe( "fms\\s+dir\\s*t?o?[\\s +](\\d+)",regex_constants::icase);
 
 /**
  * quit or exit
  */
-regex quitRe("(quit|exit)",regex_constants::icase);
+
+const regex quitRe("(quit|exit|disconnect)",regex_constants::icase);
 /**
  * help
  */
-regex helpRe("(help|\\?)",regex_constants::icase);
+const regex helpRe("(help|\\?)",regex_constants::icase);
 
-/**regular expression for xplane dataref abc/abdc... */
-//regex datarefRe("(.+\\/.+)+");
-regex datarefRe("(?:(?:(?:[a-z]|[A-Z]|[0-9]|_)+)\\/)+(?:[a-z]|[A-Z]|[0-9]|_)+");
 /**regular expression for integer */
-regex integerRe("[-+]?\\d+");
+const regex integerRe("[-+]?\\d+");
 /**regular expression for float */
-regex floatRe("[+-]?\\d+.+\\d+");
+const regex floatRe("[+-]?\\d+.+\\d+");
 /**regular expression for boolean (true or false only) */
-regex booleanRe("(true|false)");
+const regex booleanRe("(true|false)");
 /**regular expression for array ([xxx, xxx, xxx...]) */
-regex arrayRe("\\[((?:\\d+\\.*\\d*,*\\s*)+)\\]");
+const regex arrayRe("\\[((?:\\d+\\.*\\d*,*\\s*)+)\\]");
 
 CommandInterpretor::CommandInterpretor(string msg) {
 	source = msg;
@@ -99,52 +97,46 @@ CommandInterpretor::CommandInterpretor(string msg) {
 CommandInterpretor::~CommandInterpretor() {
 }
 
-commands CommandInterpretor::parseCmd(string msg){
-	commands res = INVALID;
+Commands CommandInterpretor::parseCmd(string msg){
+	Commands res = Commands::INVALID;
 	group.clear();
 	smatch matches;
 	regex re;
-	if (regex_match( msg, helloRe)){
-		res = HELLO;
-		re = helloRe;
-	}else if (regex_match(msg, cmdRe)){
-		res = COMMAND;
+	if (regex_match(msg, cmdRe)){
+		res = Commands::COMMAND;
 		re = cmdRe;
-	}else if (regex_match(msg, setValueRe)){
-		res = SET_VALUE;
-		re = setValueRe;
-	}else if (regex_match(msg, getValueRe)){
-		res = GET_VALUE;
-		re = getValueRe;
-	}else if (regex_match(msg, getMultIndexRe)){
-		res = GET_VALUE;
-		re = getMultIndexRe;
+	}else if (regex_match(msg, setRe)){
+		res = Commands::SET_VALUE;
+		re = setRe;
+	}else if (regex_match(msg, getRe)){
+		res = Commands::GET_VALUE;
+		re = getRe;
 	}else if (regex_match(msg, fmsInitRe)){
-		res = FMS_INIT;
+		res = Commands::FMS_INIT;
 		re = fmsInitRe;
 	}else if (regex_match(msg, fmsClearRe)){
-		res = FMS_CLR;
+		res = Commands::FMS_CLR;
 		re = fmsClearRe;
 	}else if (regex_match(msg, fmsSetRe)){
-		res = FMS_SET;
+		res = Commands::FMS_SET;
 		re = fmsSetRe;
 	}else if (regex_match(msg, fmsInsRe)){
-		res = FMS_INSERT;
+		res = Commands::FMS_INSERT;
 		re = fmsInsRe;
 	}else if (regex_match(msg, fmsAddRe)){
-		res = FMS_ADD;
+		res = Commands::FMS_ADD;
 		re = fmsAddRe;
 	}else if (regex_match(msg, fmsCountRe)){
-		res = FMS_COUNT;
+		res = Commands::FMS_COUNT;
 		re = fmsCountRe;
 	}else if (regex_match(msg, fmsDtoRe)){
-		res = FMS_DIR_TO;
+		res = Commands::FMS_DIR_TO;
 		re = fmsDtoRe;
 	}else if (regex_match(msg, quitRe)){
-		res = QUIT;
+		res = Commands::QUIT;
 		re = quitRe;
 	}else if (regex_match(msg, helpRe)){
-		res = HELP;
+		res = Commands::HELP;
 		re = helpRe;
 	}
 	if(regex_search(msg, matches, re)) {

@@ -11,7 +11,7 @@
 #include <vector>
 #include <regex>
 
-enum commands {
+enum class Commands {
 	INVALID=0,
 	HELLO=1,
 	COMMAND=2,
@@ -31,15 +31,15 @@ enum commands {
 
 class CommandInterpretor {
 public:
-	commands cmd;
+	Commands cmd;
     std::vector<std::string> group;
 	std::string source;
 
 	CommandInterpretor(std::string msg);
 	virtual ~CommandInterpretor();
-	commands parseCmd(std::string msg);
+	Commands parseCmd(std::string msg);
 
-	commands getCmd() const {
+	Commands getCmd() const {
 		return cmd;
 	}
 

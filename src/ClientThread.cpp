@@ -85,7 +85,7 @@ DWORD ClientThread::run(){
 				// end of line detected, analyse message
 				string message(charBuffer);
 				CommandInterpretor ci(message);
-				commands cmd = ci.getCmd();
+				Commands cmd = ci.getCmd();
 				ostringstream reply, os;
 				string cmdName = "";
 				string value = "";
@@ -102,11 +102,11 @@ DWORD ClientThread::run(){
 				string dataref; //dataref as string
 
 				switch (cmd) {
-				case INVALID:
+				case Commands::INVALID:
 					reply << "unknown command " << message << "\n";
 					pTcpSock->send(reply.str().c_str(), reply.str().length());
 					break;
-				case HELLO:
+				case Commands::HELLO:
 					name = ci.getGroupAsString(0); //the name of the client
 					machine = ci.getGroupAsString(1); // it should also give the name of the host
 					os << "hello " << name << " on " << machine << "\n";
@@ -115,7 +115,7 @@ DWORD ClientThread::run(){
 					os << PLUGIN_NAME << " V-" << PLUGIN_VERSION << "." << PLUGIN_RELEASE << "\n";
 					pTcpSock->send(os.str().c_str(), os.str().length());
 					break;
-				case COMMAND:
+				case Commands::COMMAND:
 					cmdName = ci.getGroupAsString(0);
 					ref = XPLMFindCommand(cmdName.c_str());
 					if (ref != NULL) {
@@ -130,7 +130,7 @@ DWORD ClientThread::run(){
 						}
 					}
 					break;
-				case SET_VALUE:
+				case Commands::SET_VALUE:
 					//set value datarefm str
 					//require the data given in dataref (field 1) to be changed with the value in field 2
 					if (ci.isDataref()) {
@@ -173,18 +173,18 @@ DWORD ClientThread::run(){
 					}
 
 					break;
-				case GET_VALUE:
+				case Commands::GET_VALUE:
 					//get value numdata cycle loop
 					//require the data given in dataref index (field 1) to be send every x cycles (field 2)
 					//continuously if loop (field 3) is true
 					addDataToCycle(address, ci.getGroupAsString(0), ci.getGroupAsInt(1), ci.getGroupAsBool(2));
 					break;
-				case QUIT:
+				case Commands::QUIT:
 					eot = true;
 					terminated = true;
 					pTcpSock->send(string("bye\n").c_str(), 4);
 					break;
-				case HELP:
+				case Commands::HELP:
 					const string answer = ci.getHelp();
 					int lenght = answer.length();
 					pTcpSock->send(answer.c_str(), lenght);

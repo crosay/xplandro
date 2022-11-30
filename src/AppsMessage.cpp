@@ -158,11 +158,7 @@ AppsMessage::~AppsMessage() {
  * buid a key that can identify a unique means to address a data (ip address and dataref)
  */
 int buildKey(std::string addrs, std::string dataref) {
-	char ckey[255];
 	std::hash<std::string> str_hash;
-
-	sprintf(ckey, "%s:%s", addrs.c_str(),dataref);
-	std::string res(ckey);
-	return str_hash(res);
+	return str_hash(addrs + dataref);
 }
 

@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27130.2036
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.33027.164
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "avandroxplane", "avandroxplane.vcxproj", "{799AFBA7-1A40-4126-A592-DB1FF7E6F0DB}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unitTestCommandIntepretor", "..\testCommandInterpretor\testCommandInterpretor.vcxproj", "{784AE887-340D-4F68-A0E2-68E8D06FCC4D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,18 +24,6 @@ Global
 		{799AFBA7-1A40-4126-A592-DB1FF7E6F0DB}.Release|x64.ActiveCfg = Release|x64
 		{799AFBA7-1A40-4126-A592-DB1FF7E6F0DB}.Release|x64.Build.0 = Release|x64
 		{799AFBA7-1A40-4126-A592-DB1FF7E6F0DB}.Release|x86.ActiveCfg = Release|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Debug|x64.ActiveCfg = Debug|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Debug|x64.Build.0 = Debug|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Debug|x86.ActiveCfg = Debug|Win32
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Debug|x86.Build.0 = Debug|Win32
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.evaluation|x64.ActiveCfg = Release|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.evaluation|x64.Build.0 = Release|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.evaluation|x86.ActiveCfg = Release|Win32
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.evaluation|x86.Build.0 = Release|Win32
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Release|x64.ActiveCfg = Release|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Release|x64.Build.0 = Release|x64
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Release|x86.ActiveCfg = Release|Win32
-		{784AE887-340D-4F68-A0E2-68E8D06FCC4D}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

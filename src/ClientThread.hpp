@@ -30,7 +30,7 @@ private:
 	string name;
 	string machine;
 	string address;
-	TCPSocket *pTcpSock;
+	TCPSocket *pTcpSock = NULL;
 	int libVersion = 1;
 	thread hThread;
 	bool terminated = false;
@@ -44,8 +44,7 @@ private:
 	void insertFMSEntry(int before, string id, float lat, float lon, int altitude, int type, bool flyover);
 
 	void removeMessageRequestsFrom(const string address);
-public:
-	ClientThread() : hThread(){}
+public:	ClientThread() : hThread(){}
 	ClientThread(TCPSocket *tcps);
 	~ClientThread();
 	DWORD run();
@@ -59,7 +58,7 @@ public:
 	bool isTerminated(){return terminated;}
 	bool hasDataToSend(){return dataToSend;}
 	void clearDataToSend(){dataToSend=false;}
-	void sendData(string msg){pTcpSock->send(msg.c_str() , msg.length());}
+	void sendData(string msg){if (pTcpSock != NULL) pTcpSock->send(msg.c_str() , msg.length());}
 };
 
 #endif /* SRC_CLIENTTHREAD_HPP_ */
